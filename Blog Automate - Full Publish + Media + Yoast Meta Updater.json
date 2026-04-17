@@ -1,0 +1,658 @@
+{
+  "name": "Blog Automate - Full Publish + Media + Yoast Meta Updater",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "38e4a091-19a5-42fc-b612-e8a219503a20",
+      "name": "Schedule Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1S8tpAcGml_5UBc6K3xD1AjEqKnG9ObJCDIJB5nJsv7c"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "blog-automate"
+        },
+        "options": {}
+      },
+      "id": "6da5ec35-0c0c-4d8e-9e5c-e55d505e7c95",
+      "name": "Read Google Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1360,
+        48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "s5OYBJO1QyxPyVgO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Status === 'Ready' && (!$json['Publish At'] || Date.parse($json['Publish At']) <= Date.now()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9d6a0df1-a755-445e-bae2-bdeeb32e021e",
+      "name": "If Ready To Publish1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function toIdArray(value) {\n  if (!value) return [];\n  return String(value)\n    .split(',')\n    .map(v => v.trim())\n    .filter(Boolean)\n    .map(v => Number(v))\n    .filter(v => !Number.isNaN(v));\n}\n\nfunction styleContent(html) {\n  if (!html) return '';\n  let out = String(html);\n  out = out.replace(/<h2(\\s[^>]*)?>/gi, '<h2 class=\"automate-h2\">');\n  out = out.replace(/<h3(\\s[^>]*)?>/gi, '<h3 class=\"automate-h3\">');\n  out = out.replace(/<p(\\s[^>]*)?>/gi, '<p class=\"automate para\">');\n  return out;\n}\n\nconst h1 = ($json['H1'] || '').trim();\nconst bodyHtml = ($json['Body HTML'] || '').trim();\nconst combined = h1 ? `<h1>${h1}</h1>\\n${bodyHtml}` : bodyHtml;\n\nconst featureImageUrl = ($json['Feature Image'] || '').trim();\nconst imageFileName = featureImageUrl ? featureImageUrl.split('/').pop().split('?')[0] : '';\nconst imageSearchTerm = imageFileName ? imageFileName.replace(/\\.[^.]+$/, '') : '';\n\nreturn [{\n  json: {\n    row_number: String($json['row_number'] || '').trim(),\n    title: ($json['Title'] || '').trim(),\n    slug: ($json['Slug'] || '').trim(),\n    excerpt: ($json['Excerpt'] || '').trim(),\n    content: styleContent(combined),\n    postStatus: String($json['Post Status'] || 'draft').trim().toLowerCase(),\n    categoryIds: toIdArray($json['Category']),\n    tagIds: toIdArray($json['Tags']),\n    featureImageUrl,\n    imageFileName,\n    imageSearchTerm,\n    existingPostId: String($json['WordPress Post ID'] || '').trim(),\n    seoTitle: ($json['SEO Title'] || '').trim(),\n    metaDescription: ($json['Meta Description'] || '').trim(),\n    canonicalUrl: ($json['Canonical URL'] || '').trim(),\n    socialTitle: ($json['Social Title'] || '').trim(),\n    socialDescription: ($json['Social Description'] || '').trim(),\n    focusKeyword: ($json['Focus Keyword'] || '').trim()\n  }\n}];"
+      },
+      "id": "2d161fba-2460-4bfa-9089-7d1cde316d4b",
+      "name": "Prepare Post Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.featureImageUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2dddcd5d-c4ad-4d58-ac76-b7adb83c27c8",
+      "name": "If Feature Image Exists1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, featuredMediaId: '' } }];"
+      },
+      "id": "b6d3e23e-74d2-4c54-b68f-fded34cc3340",
+      "name": "No Featured Media1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://staging.sageitinc.com/wp-json/wp/v2/media?search={{ encodeURIComponent($json.imageSearchTerm || '') }}&per_page=20",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "id": "db6d260b-c4ae-4690-8dd7-2321dbfe3cbe",
+      "name": "Search Existing Media1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        -80
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Wg1ivAH8gdJLMtjS",
+          "name": "Wordpress"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('Prepare Post Data1').first().json;\nconst results = Array.isArray($json) ? $json : [];\nconst fileName = String(original.imageFileName || '').toLowerCase();\nconst stem = String(original.imageSearchTerm || '').toLowerCase();\n\nlet matched = null;\nif (results.length) {\n  matched = results.find(item => {\n    const src = String(item.source_url || '').toLowerCase();\n    return (fileName && src.includes(fileName)) || (stem && src.includes(stem));\n  }) || null;\n}\n\nreturn [{\n  json: {\n    ...original,\n    featuredMediaId: matched ? matched.id : '',\n    needUpload: matched ? false : true\n  }\n}];"
+      },
+      "id": "4fbaf001-58df-4124-84bb-9ceece5b44de",
+      "name": "Resolve Existing Media1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needUpload }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22e9d70f-864e-4c1c-9564-0695b1db0a6d",
+      "name": "If Upload Needed1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json } }];"
+      },
+      "id": "b5d7aabd-9e8a-45af-8e94-a05be62def16",
+      "name": "Reuse Existing Media1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Prepare Post Data1').first().json.featureImageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "e1f9b0e4-0632-4f63-817d-814ffebf2db7",
+      "name": "Download Feature Image1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://staging.sageitinc.com/wp-json/wp/v2/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Disposition",
+              "value": "=attachment; filename={{ $('Download Feature Image1').first().binary.data.fileName || 'featured-image.jpg' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "={{ $('Download Feature Image1').first().binary.data.mimeType || 'image/jpeg' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "919c21b0-dfee-47bf-a122-cef0096691ce",
+      "name": "Upload Media to WordPress1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        -192
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Wg1ivAH8gdJLMtjS",
+          "name": "Wordpress"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$('Resolve Existing Media1').first().json,\n    featuredMediaId: $json.id || ''\n  }\n}];"
+      },
+      "id": "07aac674-f44b-490e-abf6-b7d5a94f2b80",
+      "name": "Attach Featured Media1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.existingPostId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "701e8dee-90b3-433f-b9dc-bb2ca69e82cd",
+      "name": "If Existing Post1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://staging.sageitinc.com/wp-json/wp/v2/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"title\": $json.title,\n  \"slug\": $json.slug,\n  \"status\": $json.postStatus,\n  \"content\": $json.content,\n  \"excerpt\": $json.excerpt,\n  \"categories\": $json.categoryIds,\n  \"tags\": $json.tagIds,\n  ...(Number($json.featuredMediaId || 0) ? { \"featured_media\": Number($json.featuredMediaId || 0) } : {})\n} }}",
+        "options": {}
+      },
+      "id": "c0b978b8-01c1-4439-9e91-41501e047d81",
+      "name": "Create WP Post1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1280,
+        -32
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Wg1ivAH8gdJLMtjS",
+          "name": "Wordpress"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://staging.sageitinc.com/wp-json/wp/v2/posts/{{$json.existingPostId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"title\": $json.title,\n  \"slug\": $json.slug,\n  \"status\": $json.postStatus,\n  \"content\": $json.content,\n  \"excerpt\": $json.excerpt,\n  \"categories\": $json.categoryIds,\n  \"tags\": $json.tagIds,\n  ...(Number($json.featuredMediaId || 0) ? { \"featured_media\": Number($json.featuredMediaId || 0) } : {})\n} }}",
+        "options": {}
+      },
+      "id": "4ba7360f-b023-4925-846d-083af9e12869",
+      "name": "Update WP Post1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1280,
+        128
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Wg1ivAH8gdJLMtjS",
+          "name": "Wordpress"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://staging.sageitinc.com/wp-json/sage-seo/v1/update-meta",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"post_id\": $json.id,\n  \"seo_title\": $('Prepare Post Data1').first().json.seoTitle,\n  \"meta_description\": $('Prepare Post Data1').first().json.metaDescription,\n  \"canonical_url\": $('Prepare Post Data1').first().json.canonicalUrl,\n  \"social_title\": $('Prepare Post Data1').first().json.socialTitle,\n  \"social_description\": $('Prepare Post Data1').first().json.socialDescription,\n  \"focus_keyword\": $('Prepare Post Data1').first().json.focusKeyword\n} }}",
+        "options": {}
+      },
+      "id": "54ac7c42-aefa-4e74-8d82-e3163af56347",
+      "name": "Update Yoast SEO Meta1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1760,
+        48
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Wg1ivAH8gdJLMtjS",
+          "name": "Wordpress"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1S8tpAcGml_5UBc6K3xD1AjEqKnG9ObJCDIJB5nJsv7c",
+          "mode": "list",
+          "cachedResultName": "Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1S8tpAcGml_5UBc6K3xD1AjEqKnG9ObJCDIJB5nJsv7c/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "blog-automate",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1S8tpAcGml_5UBc6K3xD1AjEqKnG9ObJCDIJB5nJsv7c/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "4c6e26f5-8042-4427-8493-0b9100a3484d",
+      "name": "Update Sheet Success1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "s5OYBJO1QyxPyVgO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheet1": {
+      "main": [
+        [
+          {
+            "node": "If Ready To Publish1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Ready To Publish1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post Data1": {
+      "main": [
+        [
+          {
+            "node": "If Feature Image Exists1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Feature Image Exists1": {
+      "main": [
+        [
+          {
+            "node": "Search Existing Media1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Featured Media1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Existing Media1": {
+      "main": [
+        [
+          {
+            "node": "Resolve Existing Media1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Existing Media1": {
+      "main": [
+        [
+          {
+            "node": "If Upload Needed1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Upload Needed1": {
+      "main": [
+        [
+          {
+            "node": "Download Feature Image1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reuse Existing Media1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Feature Image1": {
+      "main": [
+        [
+          {
+            "node": "Upload Media to WordPress1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media to WordPress1": {
+      "main": [
+        [
+          {
+            "node": "Attach Featured Media1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Featured Media1": {
+      "main": [
+        [
+          {
+            "node": "If Existing Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reuse Existing Media1": {
+      "main": [
+        [
+          {
+            "node": "If Existing Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Featured Media1": {
+      "main": [
+        [
+          {
+            "node": "If Existing Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Existing Post1": {
+      "main": [
+        [
+          {
+            "node": "Update WP Post1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create WP Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create WP Post1": {
+      "main": [
+        [
+          {
+            "node": "Update Yoast SEO Meta1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update WP Post1": {
+      "main": [
+        [
+          {
+            "node": "Update Yoast SEO Meta1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Yoast SEO Meta1": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d7581791-aa57-4cd1-91ff-cee70e6b525f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f864e922c22753b15c519a6a821b5f27a814a1e42299d7490d5146a1ea56dd5c"
+  },
+  "id": "2eQUcat0PYBWpijT",
+  "tags": []
+}
